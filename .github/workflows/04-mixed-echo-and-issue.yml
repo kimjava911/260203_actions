@@ -69,12 +69,14 @@ jobs:
       - name: push(main) 메시지
         # push 이벤트이면서 main 브랜치일 때만 실행
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: echo "push: main 브랜치에 반영되었습니다."
+        run: |
+          echo "push: main 브랜치에 반영되었습니다."
 
       - name: push(main 외) 메시지
         # push 이벤트이면서 main 이외 브랜치일 때만 실행
         if: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
-        run: echo "push: main이 아닌 브랜치(${GITHUB_REF_NAME})에 반영되었습니다."
+        run: |
+          echo "push: main이 아닌 브랜치(${GITHUB_REF_NAME})에 반영되었습니다."
 
       - name: pull_request 메시지
         # PR 이벤트일 때만 실행
