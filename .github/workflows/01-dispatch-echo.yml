@@ -1,0 +1,27 @@
+name: 01. Dispatch Echo (수동 실행)
+
+# 이 워크플로는 "수동 실행"(workflow_dispatch)만을 다루는 가장 단순한 예시입니다.
+# GitHub 웹 UI에서 Actions 탭 → 이 워크플로 선택 → Run workflow 로 실행할 수 있습니다.
+
+on:
+  # workflow_dispatch: 사용자가 버튼을 눌러 수동으로 실행하는 트리거
+  workflow_dispatch:
+    inputs:
+      message:
+        # 사용자가 Run workflow 화면에서 입력할 수 있는 값(옵션)
+        # 입력하지 않으면 default 값이 사용됩니다.
+        description: "출력할 메시지"
+        required: false
+        default: "workflow_dispatch에서 실행되었습니다"
+
+jobs:
+  echo:
+    # GitHub가 제공하는 호스팅 러너(리눅스)에서 실행합니다.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo message
+        run: |
+          # github.actor: 이 워크플로를 실행한 사용자/봇 계정
+          echo "실행자: ${{ github.actor }}"
+          # inputs.message: workflow_dispatch 입력값
+          echo "메시지: ${{ inputs.message }}"

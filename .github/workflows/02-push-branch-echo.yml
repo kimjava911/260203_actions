@@ -1,0 +1,25 @@
+name: 02. Push Branch Echo (main 여부)
+
+on:
+  # push: 커밋이 원격 저장소로 push 될 때 실행됩니다.
+  push:
+    branches:
+      # "**" 는 모든 브랜치를 의미합니다.
+      # main만 보고 싶다면 여기서 - main 으로 제한할 수 있습니다.
+      - "**"
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 메인 브랜치 푸시 메시지
+        # github.ref 는 refs/heads/<branch> 형태의 전체 ref 입니다.
+        # main 브랜치에 push 된 경우에만 이 step이 실행됩니다.
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: echo "main 브랜치에 push 되었습니다."
+
+      - name: 메인 외 브랜치 푸시 메시지
+        # main이 아닌 다른 브랜치에 push 된 경우에만 이 step이 실행됩니다.
+        if: ${{ github.ref != 'refs/heads/main' }}
+        # GITHUB_REF_NAME 은 브랜치명만 담긴 환경변수입니다(예: feature/login).
+        run: echo "main이 아닌 브랜치(${GITHUB_REF_NAME})에 push 되었습니다."

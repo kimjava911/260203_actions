@@ -1,0 +1,134 @@
+name: 04. Mixed Triggers + Echo + Issue
+
+# 이 워크플로는 아래 트리거들을 "한 파일"에서 동시에 다루는 실습용 예시입니다.
+# - workflow_dispatch: 수동 실행 + 입력값
+# - push: 브랜치에 push
+# - pull_request: PR 생성/업데이트
+# - schedule: 주기 실행(cron)
+# 그리고 내장 토큰(GITHUB_TOKEN)으로 "이슈 발행"(Issues API 호출)까지 보여줍니다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "로그에 출력할 메시지"
+        required: false
+        default: "혼합 워크플로 실습입니다"
+      create_issue:
+        description: "이슈도 함께 생성할까요? (push/PR에서는 자동 생성하지 않음)"
+        required: false
+        type: boolean
+        default: true
+      issue_title:
+        description: "생성할 이슈 제목(선택)"
+        required: false
+
+  push:
+    # 어떤 브랜치로 push 하든 실행되게 한 예시입니다.
+    # main만 대상으로 좁히려면 branches: ["main"] 으로 설정하세요.
+    branches:
+      - "**"
+
+  pull_request:
+    # PR 대상으로도 실행되도록 설정합니다.
+    branches:
+      - "**"
+
+  # 1분마다 실행을 요청하는 크론 표현식입니다.
+  # 다만 GitHub Actions 스케줄은 정확히 1분마다 실행되지 않을 수 있고,
+  # 실제로는 대기/지연되어 15~30분 간격처럼 보일 때도 있습니다.
+  # (스케줄은 UTC 기준이며, 지연/누락처럼 보일 수 있어 실습 시 주의가 필요합니다.)
+  schedule:
+    - cron: "* * * * *"
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+
+    # GITHUB_TOKEN 권한(최소화 권장).
+    # 이 워크플로는 GitHub API로 이슈를 생성해야 하므로 issues: write 권한이 필요합니다.
+    # (권한이 없으면 actions/github-script 단계에서 403 오류가 납니다.)
+    permissions:
+      contents: read
+      issues: write
+
+    # 주의: schedule에서 매번 이슈를 만들면 저장소 이슈가 폭증합니다.
+    # 안전을 위해 기본값은 "false"로 두고, 정말 필요할 때만 true로 바꾸세요.
+    env:
+      CREATE_ISSUE_ON_SCHEDULE: "false"
+
+    steps:
+      - name: 기본 정보 echo
+        run: |
+          echo "이벤트: ${{ github.event_name }}"
+          echo "브랜치: ${{ github.ref_name }}"
+          echo "커밋: ${{ github.sha }}"
+          echo "실행자: ${{ github.actor }}"
+          echo "메시지: ${{ github.event.inputs.message || '' }}"
+
+      - name: push(main) 메시지
+        # push 이벤트이면서 main 브랜치일 때만 실행
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: echo "push: main 브랜치에 반영되었습니다."
+
+      - name: push(main 외) 메시지
+        # push 이벤트이면서 main 이외 브랜치일 때만 실행
+        if: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
+        run: echo "push: main이 아닌 브랜치(${GITHUB_REF_NAME})에 반영되었습니다."
+
+      - name: pull_request 메시지
+        # PR 이벤트일 때만 실행
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+          echo "from: ${{ github.event.pull_request.head.ref }} -> to: ${{ github.event.pull_request.base.ref }}"
+
+      - name: 이슈 생성 (GITHUB_TOKEN)
+        # 아래 조건에서만 이슈를 생성합니다.
+        # - workflow_dispatch: 입력 create_issue가 true일 때
+        # - schedule: env.CREATE_ISSUE_ON_SCHEDULE 가 true일 때(기본 false)
+        # push/PR에서는 이슈를 자동 생성하지 않도록 막아둔 예시입니다.
+        if: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.create_issue == 'true' || github.event.inputs.create_issue == true)) || (github.event_name == 'schedule' && env.CREATE_ISSUE_ON_SCHEDULE == 'true') }}
+        uses: actions/github-script@v7
+        env:
+          # github-script의 core.getInput은 "action inputs" 용이라,
+          # workflow_dispatch inputs 값은 환경변수로 넘겨 안전하게 사용합니다.
+          WORKFLOW_MESSAGE: ${{ github.event.inputs.message || '' }}
+          WORKFLOW_ISSUE_TITLE: ${{ github.event.inputs.issue_title || '' }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const now = new Date().toISOString();
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+
+            const eventName = context.eventName;
+            const refName = context.ref.replace('refs/heads/', '');
+
+            const inputTitle = process.env.WORKFLOW_ISSUE_TITLE || '';
+            const title = inputTitle.trim().length > 0
+              ? inputTitle.trim()
+              : `[${eventName}] 실습 이슈 (${now})`;
+
+            const message = process.env.WORKFLOW_MESSAGE || '';
+
+            const body = [
+              `혼합 워크플로에서 자동 생성된 이슈입니다.`,
+              ``,
+              `- 이벤트: ${eventName}`,
+              `- 브랜치: ${refName}`,
+              `- 실행자: ${context.actor}`,
+              `- 실행 시각(UTC): ${now}`,
+              `- Run URL: ${runUrl}`,
+              message ? `- 메시지: ${message}` : null,
+            ].filter(Boolean).join('\n');
+
+            const created = await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body,
+            });
+
+            core.notice(`이슈 생성 완료: #${created.data.number} ${created.data.html_url}`);

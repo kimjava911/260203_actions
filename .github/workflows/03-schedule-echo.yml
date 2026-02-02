@@ -1,0 +1,26 @@
+name: 03. Scheduled Echo (cron)
+
+on:
+  # 1분마다 실행을 요청하는 크론 표현식입니다.
+  # cron 형식(UTC 기준): 분 시 일 월 요일
+  # - "* * * * *"  : 매 분
+  # - "*/5 * * * *": 5분마다
+  # - "0 0 * * *"  : 매일 00:00(UTC)
+  # 다만 GitHub Actions 스케줄은 정확히 1분마다 실행되지 않을 수 있고,
+  # 실제로는 대기/지연되어 15~30분 간격처럼 보일 때도 있습니다.
+  # (특히 무료 플랜/저활성 저장소에서 체감상 더 지연될 수 있습니다.)
+  schedule:
+    - cron: "* * * * *"
+
+  # (선택) 수동으로도 눌러서 테스트할 수 있게 열어둡니다.
+  workflow_dispatch:
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 스케줄 실행 메시지
+        run: |
+          echo "스케줄 워크플로가 실행되었습니다."
+          # date -u: UTC 시각 출력(스케줄 cron도 UTC 기준이라 같이 확인하기 좋습니다)
+          echo "실행 시각(UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
